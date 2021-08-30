@@ -1,6 +1,7 @@
 <template>
   <div class="chessehc">
-    <div v-for="board in boards" :key="board.time">
+    <div v-for="board in reverseBoards" :key="board.time">
+      t = {{ board.time }}
       <div class="board">
         <div v-for="(square, index) in board.squares.value" :key="index">
           <div
@@ -53,6 +54,142 @@ enum TimeDirection {
   forward,
   inverted,
 }
+function MoveForwardPieces(data: Chessehc, x: number, y: number, t: number) {
+  // suppress error
+  if (data.selected_square === null) {
+    return;
+  }
+
+  const selected_board_index = data.boards.findIndex((e) => e.time === t)!;
+
+  let current_board = data.boards[selected_board_index];
+  let next_board = data.boards[selected_board_index + 1];
+  if (next_board === undefined) {
+    // make future board
+    data.boards.push(current_board.makeFuture());
+  } else {
+    const boards_size = data.boards.length;
+
+    // move future pieces
+    // copy future pieces
+    for (let i = selected_board_index + 1; i < boards_size; ++i) {
+      let board_i_selected_square = data.boards[i].squares.at(
+        data.selected_square.x,
+        data.selected_square.y
+      );
+      let board_i_clicked_square = data.boards[i].squares.at(x, y);
+      if (
+        board_i_clicked_square.piece === null ||
+        (board_i_clicked_square.piece.direction === TimeDirection.forward &&
+          board_i_clicked_square.piece.tense === Tense.future)
+        // TODO: case that both forward and inverted future pieces in the same square
+      ) {
+        board_i_clicked_square.piece = board_i_selected_square.piece;
+      } else {
+        // blocked by other piece
+        break;
+      }
+    }
+    // delete future selected pieces
+    for (let i = selected_board_index + 1; i < boards_size; ++i) {
+      let board_i_selected_square = data.boards[i].squares.at(
+        data.selected_square.x,
+        data.selected_square.y
+      );
+      if (
+        board_i_selected_square.piece !== null &&
+        board_i_selected_square.piece.direction === TimeDirection.forward &&
+        board_i_selected_square.piece.tense === Tense.future
+      ) {
+        board_i_selected_square.piece = null;
+      } else {
+        // blocked by other piece
+        break;
+      }
+    }
+  }
+  // change tense of past pieces
+  for (let i = selected_board_index - 1; i >= 0; --i) {
+    let board_i_selected_square = data.boards[i].squares.at(
+      data.selected_square.x,
+      data.selected_square.y
+    );
+    let board_i_selected_piece_tence = board_i_selected_square.piece!.tense;
+    board_i_selected_square.piece!.tense = Tense.past;
+    if (board_i_selected_piece_tence === Tense.present) {
+      // blocked by present piece
+      break;
+    }
+  }
+}
+function MoveInvertedPieces(data: Chessehc, x: number, y: number, t: number) {
+  // suppress error
+  if (data.selected_square === null) {
+    return;
+  }
+
+  let selected_board_index = data.boards.findIndex((e) => e.time === t)!;
+
+  let current_board = data.boards[selected_board_index];
+  let next_board = data.boards[selected_board_index - 1];
+  if (next_board === undefined) {
+    // make future board
+    data.boards.unshift(current_board.makePast());
+    selected_board_index = selected_board_index + 1;
+  } else {
+    // move future pieces
+    // copy future pieces
+    for (let i = selected_board_index - 1; i >= 0; --i) {
+      let board_i_selected_square = data.boards[i].squares.at(
+        data.selected_square.x,
+        data.selected_square.y
+      );
+      let board_i_clicked_square = data.boards[i].squares.at(x, y);
+      if (
+        board_i_clicked_square.piece === null ||
+        (board_i_clicked_square.piece.direction === TimeDirection.inverted &&
+          board_i_clicked_square.piece.tense === Tense.future)
+        // TODO: case that both forward and inverted future pieces in the same square
+      ) {
+        board_i_clicked_square.piece = board_i_selected_square.piece;
+      } else {
+        // blocked by other piece
+        break;
+      }
+    }
+    // delete future selected pieces
+    for (let i = selected_board_index - 1; i >= 0; --i) {
+      let board_i_selected_square = data.boards[i].squares.at(
+        data.selected_square.x,
+        data.selected_square.y
+      );
+      if (
+        board_i_selected_square.piece !== null &&
+        board_i_selected_square.piece.direction === TimeDirection.inverted &&
+        board_i_selected_square.piece.tense === Tense.future
+      ) {
+        board_i_selected_square.piece = null;
+      } else {
+        // blocked by other piece
+        break;
+      }
+    }
+  }
+  const boards_size = data.boards.length;
+  // change tense of past pieces
+  for (let i = selected_board_index + 1; i < boards_size; ++i) {
+    let board_i_selected_square = data.boards[i].squares.at(
+      data.selected_square.x,
+      data.selected_square.y
+    );
+    let board_i_selected_piece_tence = board_i_selected_square.piece!.tense;
+    board_i_selected_square.piece!.tense = Tense.past;
+    if (board_i_selected_piece_tence === Tense.present) {
+      // blocked by present piece
+      break;
+    }
+  }
+}
 
 class Piece {
   owner: Owner;
@@ -90,7 +227,7 @@ class Piece {
       if (this.direction === TimeDirection.forward) {
         return new Piece(this.owner, Tense.future, this.direction);
       } else {
-        return new Piece(this.owner, Tense.past, this.direction);
+        return null;
       }
     } else {
       return new Piece(this.owner, this.tense, this.direction);
@@ -99,7 +236,7 @@ class Piece {
   makePast() {
     if (this.tense === Tense.present) {
       if (this.direction === TimeDirection.forward) {
-        return new Piece(this.owner, Tense.past, this.direction);
+        return null;
       } else {
         return new Piece(this.owner, Tense.future, this.direction);
       }
@@ -107,29 +244,27 @@ class Piece {
       return new Piece(this.owner, this.tense, this.direction);
     }
   }
+  invert() {
+    this.direction =
+      this.direction === TimeDirection.forward
+        ? TimeDirection.inverted
+        : TimeDirection.forward;
+  }
 }
 
 class Square {
   piece: Piece | null;
-  is_selected: boolean;
-  constructor(piece: Piece | null, is_selected: boolean) {
+  constructor(piece: Piece | null) {
     this.piece = piece;
-    this.is_selected = is_selected;
   }
   clone() {
-    return new Square(this.piece ? this.piece.clone() : null, this.is_selected);
+    return new Square(this.piece ? this.piece.clone() : null);
   }
   makeFuture() {
-    return new Square(
-      this.piece ? this.piece.makeFuture() : null,
-      this.is_selected
-    );
+    return new Square(this.piece ? this.piece.makeFuture() : null);
   }
   makePast() {
-    return new Square(
-      this.piece ? this.piece.makePast() : null,
-      this.is_selected
-    );
+    return new Square(this.piece ? this.piece.makePast() : null);
   }
 }
 class Squares {
@@ -144,7 +279,7 @@ class Squares {
       x,
       Array(x * y)
         .fill({})
-        .map((e) => new Square(null, false))
+        .map((e) => new Square(null))
     );
   }
   at(x: number, y: number) {
@@ -164,19 +299,33 @@ class Squares {
   }
 }
 
-class SquarePoint {
-  square: Square;
+class SelectedSquare {
+  square_ref: Square;
+  piece_ref: Piece;
   x: number;
   y: number;
   t: number;
-  constructor(square: Square, x: number, y: number, t: number) {
-    this.square = square;
+  constructor(
+    square_ref: Square,
+    piece_ref: Piece,
+    x: number,
+    y: number,
+    t: number
+  ) {
+    this.square_ref = square_ref;
+    this.piece_ref = piece_ref;
     this.x = x;
     this.y = y;
     this.t = t;
   }
   clone() {
-    return new SquarePoint(this.square, this.x, this.y, this.t);
+    return new SelectedSquare(
+      this.square_ref,
+      this.piece_ref,
+      this.x,
+      this.y,
+      this.t
+    );
   }
 }
 
@@ -197,83 +346,96 @@ class Board {
 
 import { defineComponent } from "vue";
 
+interface Chessehc {
+  boards: Board[];
+  selected_square: null | SelectedSquare;
+}
+
 export default defineComponent({
   name: "Chessehc",
   data() {
     return {
       boards: [] as Board[],
-      selected_square: null as null | SquarePoint,
-    };
+      selected_square: null as null | SelectedSquare,
+    } as Chessehc;
   },
   mounted() {
     let obj = Squares.empty(8, 8);
     this.boards = [new Board(0, obj)];
-    this.boards[0].squares.value[20].piece = new Piece(
-      Owner.you,
-      Tense.present,
-      TimeDirection.forward
-    );
-    this.boards[0].squares.value[40].piece = new Piece(
-      Owner.me,
-      Tense.present,
-      TimeDirection.inverted
-    );
-    this.boards[0].squares.value[50].piece = new Piece(
-      Owner.me,
-      Tense.present,
-      TimeDirection.forward
-    );
+    for (let i = 0; i < 16; ++i) {
+      this.boards[0].squares.value[i].piece = new Piece(
+        Owner.you,
+        Tense.present,
+        TimeDirection.forward
+      );
+    }
+    for (let i = 0; i < 16; ++i) {
+      this.boards[0].squares.value[48 + i].piece = new Piece(
+        Owner.me,
+        Tense.present,
+        TimeDirection.forward
+      );
+    }
+    this.boards[0].squares.value[62].piece!.direction = TimeDirection.inverted;
+    this.boards[0].squares.value[63].piece!.direction = TimeDirection.inverted;
     this.boards.push(this.boards[0].makeFuture());
     this.boards.unshift(this.boards[0].makePast());
   },
   methods: {
     clickSquare(square: Square, x: number, y: number, t: number) {
-      if (this.selected_square !== null && this.selected_square.t === t) {
-        if (square !== this.selected_square.square) {
-          // square.piece = this.selected_square.piece;
-          // this.selected_square.piece = null;
-          let selected_direction = this.selected_square.square.piece!.direction;
-          let moving_time =
-            selected_direction === TimeDirection.forward ? 1 : -1;
-          let next_time = t + moving_time;
-          let next_board = this.boards.find((e) => e.time === next_time)!;
-          let next_next_time = next_time + moving_time;
-          let clicked_next_time_square = next_board.squares.at(x, y);
-          let selected_next_time_square = next_board.squares.at(
-            this.selected_square.x,
-            this.selected_square.y
-          );
-          clicked_next_time_square.piece = selected_next_time_square.piece;
-          clicked_next_time_square.piece!.tense = Tense.present;
-          selected_next_time_square.piece = null;
-          let next_next_board = this.boards.find(
-            (e) => e.time === next_next_time
-          );
-          this.selected_square.square.piece!.tense = Tense.past;
-          if (next_next_board === undefined) {
-            if (selected_direction === TimeDirection.forward) {
-              this.boards.push(next_board.makeFuture());
-            } else {
-              this.boards.unshift(next_board.makePast());
-            }
-          }
-        }
-        this.selected_square.square.is_selected = false;
-        this.selected_square = null;
-      } else {
+      if (this.selected_square === null) {
+        // select
         if (square.piece) {
-          if (square.piece.tense === Tense.present) {
-            this.selected_square = new SquarePoint(square, x, y, t);
-            square.is_selected = true;
+          if (square.piece.tense === Tense.future) {
+            this.selected_square = new SelectedSquare(
+              square,
+              square.piece,
+              x,
+              y,
+              t
+            );
           }
         }
+        return;
+      }
+
+      // if click same square
+      if (square === this.selected_square.square_ref) {
+        // cancel
+        this.selected_square = null;
+        return;
+      }
+
+      // move
+      if (this.selected_square.t === t) {
+        // move current piece
+        square.piece = this.selected_square.piece_ref;
+        square.piece.tense = Tense.present;
+        this.selected_square.square_ref.piece = null;
+
+        let selected_direction = this.selected_square.piece_ref.direction;
+        if (selected_direction === TimeDirection.forward) {
+          MoveForwardPieces(this, x, y, t);
+        } else {
+          MoveInvertedPieces(this, x, y, t);
+        }
+
+        this.selected_square = null;
       }
     },
     squareColor(square: Square, x: number, y: number) {
-      if (square.is_selected) {
+      if (
+        this.selected_square !== null &&
+        this.selected_square.square_ref === square
+      ) {
         return "square-moving";
       }
       return (x + y) % 2 == 0 ? "square-black" : "square-white";
+    },
+  },
+  computed: {
+    reverseBoards(): Board[] {
+      return this.boards.slice().reverse();
     },
   },
 });
