@@ -60,7 +60,7 @@ function InvertTimeDirection(direction: TimeDirection) {
     : TimeDirection.forward;
 }
 
-function DeleteFutureSelectedPieces(
+function DeleteFuturePieces(
   data: Chessehc,
   current_board: Board,
   direction: TimeDirection
@@ -88,6 +88,35 @@ function DeleteFutureSelectedPieces(
   }
 }
 
+function MakeFuturePieces(
+  data: Chessehc,
+  current_board: Board,
+  direction: TimeDirection,
+  x: number,
+  y: number
+) {
+  // suppress error
+  if (data.selected_square === null) {
+    return;
+  }
+
+  for (let future_board of current_board.futureBoards(direction)) {
+    let future_square = future_board.squares.at(x, y);
+    if (
+      future_square.piece === null ||
+      (future_square.piece.direction === direction &&
+        future_square.piece.tense === Tense.future)
+      // TODO: case that both forward and inverted future pieces in the same square
+    ) {
+      future_square.piece = data.selected_square.piece_ref.clone();
+      future_square.piece.tense = Tense.future;
+    } else {
+      // blocked by other piece
+      break;
+    }
+  }
+}
+
 function MoveFuturePieces(data: Chessehc, x: number, y: number, t: number) {
   // suppress error
   if (data.selected_square === null) {
@@ -102,24 +131,8 @@ function MoveFuturePieces(data: Chessehc, x: number, y: number, t: number) {
     data.boards.makeNew(direction);
   } else {
     // move future pieces
-    // make future pieces
-    for (let future_board of current_board.futureBoards(direction)) {
-      let future_square = future_board.squares.at(x, y);
-      if (
-        future_square.piece === null ||
-        (future_square.piece.direction === direction &&
-          future_square.piece.tense === Tense.future)
-        // TODO: case that both forward and inverted future pieces in the same square
-      ) {
-        future_square.piece = data.selected_square.piece_ref.clone();
-        future_square.piece.tense = Tense.future;
-      } else {
-        // blocked by other piece
-        break;
-      }
-    }
-    // delete future selected pieces
-    DeleteFutureSelectedPieces(data, current_board, direction);
+    MakeFuturePieces(data, current_board, direction, x, y);
+    DeleteFuturePieces(data, current_board, direction);
   }
   // change tense of past pieces
   for (let future_board of current_board.futureBoards(
@@ -417,7 +430,7 @@ export default defineComponent({
           if (square.piece.tense === Tense.present) {
             this.will_invert = true;
             let direction = this.selected_square.piece_ref.direction;
-            DeleteFutureSelectedPieces(this, this.boards.at(t), direction);
+            DeleteFuturePieces(this, this.boards.at(t), direction);
             this.selected_square.piece_ref.invert();
             this.selected_square.square_ref = this.boards
               .at(t)
@@ -440,19 +453,27 @@ export default defineComponent({
         // cancel
         if (this.will_invert) {
           this.will_invert = false;
-          if (
-            this.selected_square.piece_ref.direction === TimeDirection.inverted
-          ) {
-            this.boards
-              .at(this.selected_square!.t + 1)!
-              .squares.at(x, y)
-              .piece!.invert();
-          } else {
-            this.boards
-              .at(this.selected_square!.t - 1)!
-              .squares.at(x, y)
-              .piece!.invert();
-          }
+          this.selected_square.t =
+            t +
+            (this.selected_square.piece_ref.direction === TimeDirection.forward
+              ? -1
+              : 1);
+          let original_selected_board = this.boards.at(this.selected_square.t);
+          this.selected_square.square_ref = original_selected_board.squares.at(
+            x,
+            y
+          );
+          this.selected_square.piece_ref =
+            this.selected_square.square_ref.piece!;
+          this.selected_square.piece_ref.invert();
+          MakeFuturePieces(
+            this,
+            original_selected_board,
+            this.selected_square.piece_ref.direction,
+            x,
+            y
+          );
+          this.boards.at(t).squares.at(x, y).piece = null;
         }
         this.selected_square = null;
         return;
