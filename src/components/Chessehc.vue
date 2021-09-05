@@ -398,17 +398,6 @@ export default defineComponent({
     }
     this.boards.makeFuture();
     this.boards.makePast();
-
-    // console.log("start");
-    // let j = 0;
-    // for (let i of this.boards.futureBoards(1, TimeDirection.inverted)) {
-    //   j++;
-    //   if (j > 10) {
-    //     break;
-    //   }
-    //   console.log(i);
-    // }
-    // console.log("Lo");
   },
   methods: {
     clickSquare(square: Square, x: number, y: number, t: number) {
@@ -440,7 +429,7 @@ export default defineComponent({
             this.selected_square.piece_ref =
               this.selected_square.square_ref.piece;
             this.selected_square.t =
-              t + direction === TimeDirection.forward ? -1 : 1;
+              t + (direction === TimeDirection.forward ? -1 : 1);
           }
         }
         return;
