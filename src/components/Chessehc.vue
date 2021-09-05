@@ -54,30 +54,61 @@ enum TimeDirection {
   forward,
   inverted,
 }
+
+function DeleteForwardFutureSelectedPieces(
+  data: Chessehc,
+  selected_board_index: number,
+  boards_size: number
+) {
+  // suppress error
+  if (data.selected_square === null) {
+    return;
+  }
+
+  for (let i = selected_board_index + 1; i < boards_size; ++i) {
+    let board_i_selected_square = data.boards.value[i].squares.at(
+      data.selected_square.x,
+      data.selected_square.y
+    );
+    if (
+      board_i_selected_square.piece !== null &&
+      board_i_selected_square.piece.direction === TimeDirection.forward &&
+      board_i_selected_square.piece.tense === Tense.future
+    ) {
+      board_i_selected_square.piece = null;
+    } else {
+      // blocked by other piece
+      break;
+    }
+  }
+}
+
 function MoveForwardPieces(data: Chessehc, x: number, y: number, t: number) {
   // suppress error
   if (data.selected_square === null) {
     return;
   }
 
-  const selected_board_index = data.boards.findIndex((e) => e.time === t)!;
+  const selected_board_index = data.boards.value.findIndex(
+    (e) => e.time === t
+  )!;
 
-  let current_board = data.boards[selected_board_index];
-  let next_board = data.boards[selected_board_index + 1];
+  let current_board = data.boards.value[selected_board_index];
+  let next_board = data.boards.value[selected_board_index + 1];
   if (next_board === undefined) {
     // make future board
-    data.boards.push(current_board.makeFuture());
+    data.boards.value.push(current_board.makeFuture());
   } else {
-    const boards_size = data.boards.length;
+    const boards_size = data.boards.value.length;
 
     // move future pieces
     // copy future pieces
     for (let i = selected_board_index + 1; i < boards_size; ++i) {
-      let board_i_selected_square = data.boards[i].squares.at(
+      let board_i_selected_square = data.boards.value[i].squares.at(
         data.selected_square.x,
         data.selected_square.y
       );
-      let board_i_clicked_square = data.boards[i].squares.at(x, y);
+      let board_i_clicked_square = data.boards.value[i].squares.at(x, y);
       if (
         board_i_clicked_square.piece === null ||
         (board_i_clicked_square.piece.direction === TimeDirection.forward &&
@@ -91,26 +122,11 @@ function MoveForwardPieces(data: Chessehc, x: number, y: number, t: number) {
       }
     }
     // delete future selected pieces
-    for (let i = selected_board_index + 1; i < boards_size; ++i) {
-      let board_i_selected_square = data.boards[i].squares.at(
-        data.selected_square.x,
-        data.selected_square.y
-      );
-      if (
-        board_i_selected_square.piece !== null &&
-        board_i_selected_square.piece.direction === TimeDirection.forward &&
-        board_i_selected_square.piece.tense === Tense.future
-      ) {
-        board_i_selected_square.piece = null;
-      } else {
-        // blocked by other piece
-        break;
-      }
-    }
+    DeleteForwardFutureSelectedPieces(data, selected_board_index, boards_size);
   }
   // change tense of past pieces
   for (let i = selected_board_index - 1; i >= 0; --i) {
-    let board_i_selected_square = data.boards[i].squares.at(
+    let board_i_selected_square = data.boards.value[i].squares.at(
       data.selected_square.x,
       data.selected_square.y
     );
@@ -122,29 +138,57 @@ function MoveForwardPieces(data: Chessehc, x: number, y: number, t: number) {
     }
   }
 }
+
+function DeleteInvertedFutureSelectedPieces(
+  data: Chessehc,
+  selected_board_index: number
+) {
+  // suppress error
+  if (data.selected_square === null) {
+    return;
+  }
+
+  for (let i = selected_board_index - 1; i >= 0; --i) {
+    let board_i_selected_square = data.boards.value[i].squares.at(
+      data.selected_square.x,
+      data.selected_square.y
+    );
+    if (
+      board_i_selected_square.piece !== null &&
+      board_i_selected_square.piece.direction === TimeDirection.inverted &&
+      board_i_selected_square.piece.tense === Tense.future
+    ) {
+      board_i_selected_square.piece = null;
+    } else {
+      // blocked by other piece
+      break;
+    }
+  }
+}
+
 function MoveInvertedPieces(data: Chessehc, x: number, y: number, t: number) {
   // suppress error
   if (data.selected_square === null) {
     return;
   }
 
-  let selected_board_index = data.boards.findIndex((e) => e.time === t)!;
+  let selected_board_index = data.boards.value.findIndex((e) => e.time === t)!;
 
-  let current_board = data.boards[selected_board_index];
-  let next_board = data.boards[selected_board_index - 1];
+  let current_board = data.boards.value[selected_board_index];
+  let next_board = data.boards.value[selected_board_index - 1];
   if (next_board === undefined) {
     // make future board
-    data.boards.unshift(current_board.makePast());
+    data.boards.value.unshift(current_board.makePast());
     selected_board_index = selected_board_index + 1;
   } else {
     // move future pieces
     // copy future pieces
     for (let i = selected_board_index - 1; i >= 0; --i) {
-      let board_i_selected_square = data.boards[i].squares.at(
+      let board_i_selected_square = data.boards.value[i].squares.at(
         data.selected_square.x,
         data.selected_square.y
       );
-      let board_i_clicked_square = data.boards[i].squares.at(x, y);
+      let board_i_clicked_square = data.boards.value[i].squares.at(x, y);
       if (
         board_i_clicked_square.piece === null ||
         (board_i_clicked_square.piece.direction === TimeDirection.inverted &&
@@ -158,27 +202,12 @@ function MoveInvertedPieces(data: Chessehc, x: number, y: number, t: number) {
       }
     }
     // delete future selected pieces
-    for (let i = selected_board_index - 1; i >= 0; --i) {
-      let board_i_selected_square = data.boards[i].squares.at(
-        data.selected_square.x,
-        data.selected_square.y
-      );
-      if (
-        board_i_selected_square.piece !== null &&
-        board_i_selected_square.piece.direction === TimeDirection.inverted &&
-        board_i_selected_square.piece.tense === Tense.future
-      ) {
-        board_i_selected_square.piece = null;
-      } else {
-        // blocked by other piece
-        break;
-      }
-    }
+    DeleteInvertedFutureSelectedPieces(data, selected_board_index);
   }
-  const boards_size = data.boards.length;
+  const boards_size = data.boards.value.length;
   // change tense of past pieces
   for (let i = selected_board_index + 1; i < boards_size; ++i) {
-    let board_i_selected_square = data.boards[i].squares.at(
+    let board_i_selected_square = data.boards.value[i].squares.at(
       data.selected_square.x,
       data.selected_square.y
     );
@@ -344,56 +373,152 @@ class Board {
   }
 }
 
+class BoardIterator {
+  boards: Boards;
+  index: number;
+  direction: TimeDirection;
+  boards_size: number;
+  constructor(boards: Boards, t: number, direction: TimeDirection) {
+    this.boards = boards;
+    this.index = boards.value.findIndex((e) => e.time === t);
+    this.direction = direction;
+    this.boards_size = boards.value.length;
+  }
+  next() {
+    if (this.direction === TimeDirection.forward) {
+      this.index++;
+    } else {
+      this.index--;
+    }
+    const boards = this.boards;
+    const i = this.index;
+    const boards_size = this.boards_size;
+    return {
+      value: boards.value[i],
+      result:
+        this.direction === TimeDirection.forward ? i < boards_size : i >= 0,
+    };
+  }
+}
+
+class Boards {
+  value: Board[];
+  constructor(value: Board[]) {
+    this.value = value;
+  }
+  at(t: number) {
+    return this.value.find((e) => e.time === t);
+  }
+  after(t: number, direction: TimeDirection) {
+    return {
+      [Symbol.iterator]: () => {
+        return new BoardIterator(this, t, direction);
+      },
+    };
+  }
+}
+
 import { defineComponent } from "vue";
 
 interface Chessehc {
-  boards: Board[];
+  boards: Boards;
   selected_square: null | SelectedSquare;
+  will_invert: boolean;
 }
 
 export default defineComponent({
   name: "Chessehc",
   data() {
     return {
-      boards: [] as Board[],
+      boards: new Boards([]),
       selected_square: null as null | SelectedSquare,
+      will_invert: false,
     } as Chessehc;
   },
   mounted() {
     let obj = Squares.empty(8, 8);
-    this.boards = [new Board(0, obj)];
+    this.boards.value = [new Board(0, obj)];
     for (let i = 0; i < 16; ++i) {
-      this.boards[0].squares.value[i].piece = new Piece(
+      this.boards.value[0].squares.value[i].piece = new Piece(
         Owner.you,
         Tense.present,
         TimeDirection.forward
       );
     }
     for (let i = 0; i < 16; ++i) {
-      this.boards[0].squares.value[48 + i].piece = new Piece(
+      this.boards.value[0].squares.value[48 + i].piece = new Piece(
         Owner.me,
         Tense.present,
         TimeDirection.forward
       );
     }
-    this.boards[0].squares.value[62].piece!.direction = TimeDirection.inverted;
-    this.boards[0].squares.value[63].piece!.direction = TimeDirection.inverted;
-    this.boards.push(this.boards[0].makeFuture());
-    this.boards.unshift(this.boards[0].makePast());
+    this.boards.value.push(this.boards.value[0].makeFuture());
+    this.boards.value.unshift(this.boards.value[0].makePast());
+
+    console.log("start");
+    let j = 0;
+    for (let i of new Boards(this.boards.value).after(
+      1,
+      TimeDirection.inverted
+    )) {
+      j++;
+      if (j > 10) {
+        break;
+      }
+      console.log(i);
+    }
   },
   methods: {
     clickSquare(square: Square, x: number, y: number, t: number) {
       if (this.selected_square === null) {
         // select
         if (square.piece) {
-          if (square.piece.tense === Tense.future) {
-            this.selected_square = new SelectedSquare(
-              square,
-              square.piece,
-              x,
-              y,
-              t
-            );
+          if (square.piece.tense === Tense.past) {
+            return;
+          }
+          this.selected_square = new SelectedSquare(
+            square,
+            square.piece,
+            x,
+            y,
+            t
+          );
+          if (square.piece.tense === Tense.present) {
+            this.will_invert = true;
+            if (
+              this.selected_square.piece_ref.direction === TimeDirection.forward
+            ) {
+              DeleteForwardFutureSelectedPieces(
+                this,
+                this.boards.value.findIndex((e) => e.time === t)!,
+                this.boards.value.length
+              );
+              this.selected_square.piece_ref.invert();
+              this.selected_square.square_ref = this.boards.value
+                .find((e) => e.time === t - 1)!
+                .squares.at(x, y);
+              this.selected_square.square_ref.piece =
+                this.selected_square.piece_ref.clone();
+              this.selected_square.square_ref.piece.tense = Tense.future;
+              this.selected_square.piece_ref =
+                this.selected_square.square_ref.piece;
+              this.selected_square.t = t - 1;
+            } else {
+              DeleteInvertedFutureSelectedPieces(
+                this,
+                this.boards.value.findIndex((e) => e.time === t)!
+              );
+              this.selected_square.piece_ref.invert();
+              this.selected_square.square_ref = this.boards.value
+                .find((e) => e.time === t + 1)!
+                .squares.at(x, y);
+              this.selected_square.square_ref.piece =
+                this.selected_square.piece_ref.clone();
+              this.selected_square.square_ref.piece.tense = Tense.future;
+              this.selected_square.piece_ref =
+                this.selected_square.square_ref.piece;
+              this.selected_square.t = t + 1;
+            }
           }
         }
         return;
@@ -402,6 +527,22 @@ export default defineComponent({
       // if click same square
       if (square === this.selected_square.square_ref) {
         // cancel
+        if (this.will_invert) {
+          this.will_invert = false;
+          if (
+            this.selected_square.piece_ref.direction === TimeDirection.inverted
+          ) {
+            this.boards.value
+              .find((e) => e.time === this.selected_square!.t + 1)!
+              .squares.at(x, y)
+              .piece!.invert();
+          } else {
+            this.boards.value
+              .find((e) => e.time === this.selected_square!.t - 1)!
+              .squares.at(x, y)
+              .piece!.invert();
+          }
+        }
         this.selected_square = null;
         return;
       }
@@ -420,6 +561,9 @@ export default defineComponent({
           MoveInvertedPieces(this, x, y, t);
         }
 
+        if (this.will_invert) {
+          this.will_invert = false;
+        }
         this.selected_square = null;
       }
     },
@@ -435,7 +579,7 @@ export default defineComponent({
   },
   computed: {
     reverseBoards(): Board[] {
-      return this.boards.slice().reverse();
+      return this.boards.value.slice().reverse();
     },
   },
 });
